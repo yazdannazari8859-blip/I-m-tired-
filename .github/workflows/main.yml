@@ -28,8 +28,16 @@ jobs:
 
       - name: Extract source
         run: |
-          unzip -o VCClient-1.1-Navigation-Source-FIXED.zip -d source
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
 
+if [ -z "$ZIP_FILE" ]; then
+  echo "ERROR: No ZIP file found in repository root"
+  ls -la
+  exit 1
+fi
+
+echo "Using source archive: $ZIP_FILE"
+unzip -o "$ZIP_FILE" -d source
       - name: Build VCClient
         working-directory: source/VCClient-1.1-Navigation-Source
         run: |
