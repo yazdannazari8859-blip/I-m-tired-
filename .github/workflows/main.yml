@@ -23,30 +23,44 @@ jobs:
 
       - name: Download Gradle 2.14.1
         run: |
-          wget https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
+          wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
           unzip -q gradle-2.14.1-bin.zip
 
-      - name: Extract source
+      - name: Find and extract source ZIP
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' ! -name 'gradle-2.14.1-bin.zip' | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No source ZIP found in repository root"
+            ls -la
+            exit 1
+          fi
+          echo "Using $ZIP_FILE"
+          mkdir -p source
+          unzip -o "$ZIP_FILE" -d source
 
-if [ -z "$ZIP_FILE" ]; then
-  echo "ERROR: No ZIP file found in repository root"
-  ls -la
-  exit 1
-fi
-
-echo "Using source archive: $ZIP_FILE"
-unzip -o "$ZIP_FILE" -d source
-      - name: Build VCClient
-        working-directory: source/VCClient-1.1-Navigation-Source
+      - name: Locate Gradle project
+        id: project
         run: |
-          ../..//../gradle-2.14.1/bin/gradle build --stacktrace
+          BUILD_FILE=$(find source -name build.gradle -type f | head -n 1)
+          if [ -z "$BUILD_FILE" ]; then
+            echo "ERROR: build.gradle not found"
+            find source -maxdepth 4 -type f
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$BUILD_FILE")
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Found project: $PROJECT_DIR"
+
+      - name: Build mod
+        working-directory: .
+        run: |
+          cd "${{ steps.project.outputs.project_dir }}"
+          "$GITHUB_WORKSPACE/gradle-2.14.1/bin/gradle" build --stacktrace
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
           name: VCClient-fixed
-          path: source/VCClient-1.1-Navigation-Source/build/libs/*.jar
+          path: source/**/build/libs/*.jar
           if-no-files-found: error
           
